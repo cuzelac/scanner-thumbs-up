@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thumbs Up 3D Viewer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #1a1a2e; overflow: hidden; touch-action: none; }
+  canvas { display: block; width: 100%; height: 100vh; }
+  #loading {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: #1a1a2e; color: #e0e0e0;
+    font-family: system-ui, sans-serif; font-size: 1.2rem;
+    z-index: 10;
+  }
+  #loading.hidden { display: none; }
+</style>
+</head>
+<body>
+<div id="loading">Loading model…</div>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1a2e);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 2000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+
+// Lighting
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+
+const key = new THREE.DirectionalLight(0xffffff, 1.5);
+key.position.set(5, 10, 7);
+scene.add(key);
+
+const fill = new THREE.DirectionalLight(0x8090c0, 0.6);
+fill.position.set(-5, 3, -5);
+scene.add(fill);
+
+const rim = new THREE.DirectionalLight(0xffffff, 0.4);
+rim.position.set(0, -5, -8);
+scene.add(rim);
+
+// Load STL
+new STLLoader().load('thumbs-up-rotated.stl', (geometry) => {
+  geometry.computeVertexNormals();
+  geometry.center();
+
+  const material = new THREE.MeshStandardMaterial({
+    color: 0xb0c4de,
+    metalness: 0.3,
+    roughness: 0.5,
+  });
+
+  const mesh = new THREE.Mesh(geometry, material);
+  scene.add(mesh);
+
+  // Fit camera to model
+  const box = new THREE.Box3().setFromObject(mesh);
+  const size = box.getSize(new THREE.Vector3()).length();
+  camera.position.set(0, size * 0.4, size * 1.2);
+  controls.target.copy(box.getCenter(new THREE.Vector3()));
+  controls.update();
+
+  // Add ground grid
+  const grid = new THREE.GridHelper(size * 2, 20, 0x444466, 0x333355);
+  grid.position.y = box.min.y;
+  scene.add(grid);
+
+  document.getElementById('loading').classList.add('hidden');
+});
+
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+(function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+})();
+</script>
+</body>
+</html>
